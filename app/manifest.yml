@@ -1,0 +1,364 @@
+modules:
+  jira:globalPage:
+    - key: srd-desk
+      resource: desk
+      resolver:
+        function: resolver
+      render: native
+      title: Subject Request Desk
+      icon: resource:static;icons/desk.svg
+
+  confluence:globalPage:
+    - key: srd-desk-confluence
+      route: subject-request-desk
+      resource: confluence
+      render: native
+      title: Subject Request Desk
+      icon: resource:static;icons/desk.svg
+
+  jira:issuePanel:
+    - key: srd-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: Subject Request Desk
+      icon: resource:static;icons/desk.svg
+      viewportSize: large
+
+  jira:adminPage:
+    - key: srd-settings
+      resource: settings
+      resolver:
+        function: resolver
+      render: native
+      title: Subject Request Desk settings
+
+  rovo:agent:
+    - key: srd-agent
+      name: Privacy request assistant
+      description: >-
+        Helps a privacy officer work a data subject request from intake to the
+        answer: opens the request and its clock, finds the person's data in Jira
+        and Confluence, helps review the hits and drafts the reply. A person
+        verifies identity and closes the request.
+      icon: resource:static;icons/desk.svg
+      prompt: resource:agent;prompt.md
+      conversationStarters:
+        - Which data subject requests are due soon?
+        - Open an erasure request for this work item
+        - Find everything we hold about the person in request DSR-0001
+        - What still stops me from closing DSR-0001?
+      followUpPrompt: >-
+        Suggest up to three short follow-up questions the user could ask the
+        privacy request assistant next, based on the step just discussed.
+      actions:
+        - get-request
+        - list-requests
+        - create-request
+        - search-subject-data
+        - list-hits
+        - record-decision
+        - extend-deadline
+        - draft-response
+        - check-closure
+      skills:
+        - intake-request
+        - find-subject-data
+        - answer-requester
+
+  rovo:skill:
+    - key: intake-request
+      source:
+        dir: rovo-skills/intake-request
+      dependencies:
+        tools:
+          - list-requests
+          - get-request
+          - create-request
+          - extend-deadline
+    - key: find-subject-data
+      source:
+        dir: rovo-skills/find-subject-data
+      dependencies:
+        tools:
+          - get-request
+          - search-subject-data
+          - list-hits
+          - record-decision
+    - key: answer-requester
+      source:
+        dir: rovo-skills/answer-requester
+      dependencies:
+        tools:
+          - get-request
+          - list-hits
+          - check-closure
+          - draft-response
+
+  action:
+    - key: get-request
+      name: Get a request
+      function: fn-get-request
+      actionVerb: GET
+      description: >-
+        Get a data subject request: type, law, deadline and clock, the current
+        step, identity check, search results, hit counts and what still blocks
+        closing.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+    - key: list-requests
+      name: List requests
+      function: fn-list-requests
+      actionVerb: GET
+      description: >-
+        List the open data subject requests with their deadlines, clocks and
+        next steps, and the most recently closed ones.
+      inputs:
+        scope:
+          title: What to list
+          type: string
+          required: false
+          description: Leave empty to list everything.
+    - key: create-request
+      name: Create a request
+      function: fn-create-request
+      actionVerb: CREATE
+      description: >-
+        Open a data subject request: type, law, date received, how it arrived,
+        who it is about, the search terms (names, emails, aliases separated by
+        semicolons) and the linked work item. Starts the deadline clock.
+      inputs:
+        subject:
+          title: Who the request is about
+          type: string
+          description: A name or a reference the officer can recognise.
+        type:
+          title: Request type
+          type: string
+          required: false
+          description: access, erasure, rectification, portability, restriction or
+            objection. Default access.
+        law:
+          title: Law
+          type: string
+          required: false
+          description: gdpr, uk-gdpr, ccpa, lgpd or custom. Empty uses the site default.
+        receivedOn:
+          title: Date received
+          type: string
+          required: false
+          description: YYYY-MM-DD. Empty means today.
+        channel:
+          title: How it arrived
+          type: string
+          required: false
+          description: email, portal, letter or other.
+        terms:
+          title: Search terms
+          type: string
+          required: false
+          description: Names, email addresses and aliases, separated by semicolons.
+        issueKey:
+          title: Linked work item
+          type: string
+          required: false
+          description: For example PRIV-12. Empty uses the work item on screen.
+        notes:
+          title: Notes
+          type: string
+          required: false
+          description: Short notes about the request. Do not paste personal data from
+            other systems.
+    - key: search-subject-data
+      name: Find the subject's data
+      function: fn-find-subject-data
+      actionVerb: GET
+      description: >-
+        Search Jira work items and Confluence pages for the request's search
+        terms, as the signed-in user, and add the hits to the request for
+        review. Optionally replaces the search terms first.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        terms:
+          title: Search terms
+          type: string
+          required: false
+          description: Replaces the terms on the request when given. Names, emails and
+            aliases separated by semicolons.
+    - key: list-hits
+      name: List the hits
+      function: fn-list-hits
+      actionVerb: GET
+      description: >-
+        List the Jira and Confluence hits of a request with the decision on each
+        (pending, relevant, not relevant) and the action chosen.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        only:
+          title: Only this decision
+          type: string
+          required: false
+          description: pending, relevant or not-relevant. Empty lists all.
+    - key: record-decision
+      name: Decide on hits
+      function: fn-record-decision
+      actionVerb: UPDATE
+      description: >-
+        Record a decision on one or more hits: relevant or not relevant, and for
+        a relevant hit the action (provide, erase, redact, correct, withhold,
+        none). Withholding needs the reason in the note.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        refs:
+          title: Hit references
+          type: string
+          description: One or more references such as jira:PRIV-12 or confluence:12345,
+            separated by commas.
+        decision:
+          title: Decision
+          type: string
+          description: relevant, not-relevant or pending.
+        action:
+          title: Action
+          type: string
+          required: false
+          description: provide, erase, redact, correct, withhold or none. Only for
+            relevant hits.
+        note:
+          title: Note
+          type: string
+          required: false
+          description: Why. Required for withhold.
+    - key: extend-deadline
+      name: Extend the deadline
+      function: fn-extend-deadline
+      actionVerb: UPDATE
+      description: >-
+        Extend the response deadline once, where the law allows it, with the
+        reason given to the requester. Not possible after the deadline.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        reason:
+          title: Reason
+          type: string
+          description: Why the request is complex or numerous (at least a short sentence).
+    - key: draft-response
+      name: Draft the response
+      function: fn-draft-response
+      actionVerb: CREATE
+      description: >-
+        Draft the reply to the requester for a request and save it on the
+        request. It states what was searched and done by counts and repeats no
+        personal data. A person edits and sends it.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        outcome:
+          title: Outcome
+          type: string
+          required: false
+          description: fulfilled, partial, refused or withdrawn. Default fulfilled.
+        reason:
+          title: Reason
+          type: string
+          required: false
+          description: "Required for partial and refused: why, and the legal basis."
+    - key: check-closure
+      name: Check before closing
+      function: fn-check-closure
+      actionVerb: GET
+      description: >-
+        Check what still stops a request from being closed with an outcome:
+        identity, search, unreviewed hits, missing actions, the response text.
+      inputs:
+        requestId:
+          title: Request number
+          type: string
+          description: The request number, for example DSR-0001.
+        outcome:
+          title: Outcome
+          type: string
+          required: false
+          description: fulfilled, partial, refused or withdrawn. Default fulfilled.
+
+  scheduledTrigger:
+    - key: srd-daily
+      function: fn-daily
+      interval: day
+    - key: srd-personal-data
+      function: fn-personal-data
+      interval: week
+
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: fn-daily
+      handler: index.daily
+    - key: fn-personal-data
+      handler: index.personalData
+    - key: fn-get-request
+      handler: index.getRequest
+    - key: fn-list-requests
+      handler: index.listRequests
+    - key: fn-create-request
+      handler: index.createRequest
+    - key: fn-find-subject-data
+      handler: index.findSubjectData
+    - key: fn-list-hits
+      handler: index.listHits
+    - key: fn-record-decision
+      handler: index.recordDecision
+    - key: fn-extend-deadline
+      handler: index.extendDeadline
+    - key: fn-draft-response
+      handler: index.draftResponse
+    - key: fn-check-closure
+      handler: index.checkClosure
+
+resources:
+  - key: desk
+    path: src/frontend/desk.jsx
+  - key: panel
+    path: src/frontend/panel.jsx
+  - key: confluence
+    path: src/frontend/confluence.jsx
+  - key: settings
+    path: src/frontend/settings.jsx
+  - key: static
+    path: static
+  - key: agent
+    path: resources/agent
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - search:confluence
+    - read:confluence-content.summary
+    - storage:app
+    - report:personal-data
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/e8bc7b5d-da12-4541-ad42-6e954395fb80

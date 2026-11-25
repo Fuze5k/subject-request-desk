@@ -1,0 +1,27 @@
+{
+  "name": "subject-request-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Subject Request Desk - a case desk for data subject requests (GDPR, CCPA) in Jira and Confluence Cloud (Atlassian Forge app, Rovo).",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --test-reporter=dot \"test/*.test.js\"",
+    "typecheck": "tsc -p tsconfig.ui.json",
+    "bundle:check": "esbuild src/index.js --bundle --platform=node --format=esm --outfile=test/.build/backend.mjs --log-level=warning",
+    "check": "npm run typecheck && npm run bundle:check && npm test"
+  },
+  "dependencies": {
+    "@forge/api": "^8.5.0",
+    "@forge/bridge": "^7.3.0",
+    "@forge/kvs": "^2.1.2",
+    "@forge/react": "^12.5.0",
+    "@forge/realtime": "^1.0.3",
+    "@forge/resolver": "^2.0.2",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "react-test-renderer": "^18.3.1",
+    "typescript": "^5.9.3"
+  }
+}
